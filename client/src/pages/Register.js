@@ -9,7 +9,7 @@ function Register() {
 
   async function registerUser(e) {
     e.preventDefault();
-    const response = await fetch("http://localhost:1377/api/register", {
+    const response = await fetch("http://localhost:1377/api/user/create", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, email, password }),
@@ -19,6 +19,10 @@ function Register() {
     if (data.status === "ok") {
       alert("Registration successful");
       navigate("/login");
+    } else if (data.success === false) {
+      alert(data.errors.errors[0].msg);
+    } else if (data.error.code === 11000) {
+      alert("Email already exists!");
     }
   }
 
