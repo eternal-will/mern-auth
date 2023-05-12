@@ -1,4 +1,5 @@
 const nodemailer = require("nodemailer");
+require("dotenv").config();
 
 exports.generateOTP = () => {
   let OTP = "";
@@ -13,7 +14,7 @@ exports.maitTransport = () =>
     host: "sandbox.smtp.mailtrap.io",
     port: 2525,
     auth: {
-      user: "2a003376d8c14b",
-      pass: "6bc8c505f529e7",
+      user: process.env.MAIL_USER,
+      pass: process.env.MAIL_PASS,
     },
   });
