@@ -20,7 +20,7 @@ exports.validateUser = [
 exports.validate = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    return res.status(400).json({ success: false, errors });
+    return res.status(400).json({ success: false, error: errors.array() });
   }
   next();
 };

@@ -20,7 +20,7 @@ function Register() {
       alert("Registration successful");
       navigate("/login");
     } else if (data.success === false) {
-      alert(data.errors.errors[0].msg);
+      alert(data.error[0].msg);
     } else if (data.error.code === 11000) {
       alert("Email already exists!");
     }
