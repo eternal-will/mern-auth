@@ -1,9 +1,12 @@
 const jwt = require("jsonwebtoken");
+const { check } = require("express-validator");
 
 const User = require("../models/user.model");
-const VerificationOTP = require("../models/verificationOTP.model");
+const VerificationToken = require("../models/verificationToken.model");
+const ResetToken = require("../models/resetToken.model");
 
-const { generateOTP, maitTransport } = require("../utils/mail");
+const { generateToken, maitTransport } = require("../utils/mail");
+const { createToken } = require("../utils/helper");
 
 exports.createUser = async (req, res) => {
   try {
@@ -13,26 +16,26 @@ exports.createUser = async (req, res) => {
       password: req.body.password,
     });
 
-    const OTP = generateOTP();
+    const token = generateToken();
 
-    const verificationOTP = new VerificationOTP({
+    const verificationToken = new VerificationToken({
       owner: user._id,
-      otp: OTP,
+      token: token,
     });
 
-    await verificationOTP.save();
+    await verificationToken.save();
     await user.save();
 
     maitTransport().sendMail({
       from: "otpverification@email.com",
       to: user.email,
       subject: "Email Verification",
-      html: `<h1>OTP: ${OTP}</h1>`,
+      html: `<h1>OTP: ${token}</h1>`,
     });
 
     res.json({ status: "ok" });
   } catch (error) {
-    res.json({ status: "error", error: error });
+    res.json({ status: "error", error: error.toString() });
   }
 };
 
@@ -42,9 +45,9 @@ exports.loginUser = async (req, res) => {
       email: req.body.email,
     });
 
-    const isPasswordCorrect = await user.comparePassword(req.body.password);
+    if (!user) throw new Error("No user found with given email!");
 
-    if (isPasswordCorrect) {
+    if (await user.comparePassword(req.body.password)) {
       jwt.sign(
         {
           id: user._id,
@@ -65,10 +68,14 @@ exports.loginUser = async (req, res) => {
         }
       );
     } else {
-      return res.json({ status: "error", user: false });
+      return res.json({
+        status: "error",
+        user: false,
+        error: "Invalid email / password",
+      });
     }
   } catch (error) {
-    return res.json({ status: "error", error: error });
+    return res.json({ status: "error", error: error.toString() });
   }
 };
 
@@ -78,15 +85,13 @@ exports.verifyEmail = async (req, res) => {
 
     const user = await User.findById(userId);
 
-    const token = await VerificationOTP.findOne({ owner: userId });
+    const token = await VerificationToken.findOne({ owner: userId });
 
-    const isAccepted = await token.compareOTP(otp);
-
-    if (isAccepted) {
+    if (await token.compareToken(otp)) {
       user.isVerified = true;
 
       await user.save();
-      await VerificationOTP.findByIdAndDelete(token._id);
+      await VerificationToken.findByIdAndDelete(token._id);
 
       maitTransport().sendMail({
         from: "otpverification@email.com",
@@ -100,6 +105,72 @@ exports.verifyEmail = async (req, res) => {
       return res.json({ status: "error", error: "Invalid OTP" });
     }
   } catch (error) {
-    return res.json({ status: "error", error: error });
+    return res.json({ status: "error", error: error.toString() });
+  }
+};
+
+exports.forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    const user = await User.findOne({ email: email });
+
+    if (!user) throw new Error("No user found with given email!");
+
+    if (await ResetToken.findOne({ owner: user._id })) {
+      return res.json({
+        status: "error",
+        error: "Wait for 5 mins before making another request!",
+      });
+    }
+
+    const token = await createToken();
+
+    const resetToken = new ResetToken({ owner: user._id, token: token });
+    await resetToken.save();
+
+    resetUrl = `http://localhost:3000/reset-password?token=${token}&userId=${user._id}`;
+
+    maitTransport().sendMail({
+      from: "passwordreset@email.com",
+      to: user.email,
+      subject: "Password Reset",
+      html: `<a href="${resetUrl}">Click here to reset password</a>`,
+    });
+
+    res.json({
+      status: "ok",
+      message: "Password reset link sent to your email",
+    });
+  } catch (error) {
+    res.json({ status: "error", error: error.toString() });
+  }
+};
+
+exports.resetPassword = async (req, res) => {
+  try {
+    const { userId, password } = req.body;
+
+    const user = await User.findById(userId);
+    if (!user) throw new Error("User not found!");
+
+    if (await user.comparePassword(password))
+      throw new Error("New password can't be same as old one!");
+
+    user.password = password;
+    await user.save();
+
+    await ResetToken.findOneAndDelete({ owner: user._id });
+
+    maitTransport().sendMail({
+      from: "passwordreset@email.com",
+      to: user.email,
+      subject: "Password Reset Successful",
+      html: "<h1>Password reset successful!</h1>",
+    });
+
+    res.json({ status: "ok", message: "Password reset successful!" });
+  } catch (error) {
+    res.json({ status: "error", error: error.toString() });
   }
 };

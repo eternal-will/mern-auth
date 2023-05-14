@@ -30,7 +30,6 @@ exports.updateQuote = async (req, res) => {
 
     return res.json({ status: "ok" });
   } catch (error) {
-    console.log(error);
     res.json({ status: "error", error: "invalid token" });
   }
 };

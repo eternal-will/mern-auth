@@ -17,6 +17,10 @@ exports.validateUser = [
   check("password").isStrongPassword().withMessage("Password is not strong"),
 ];
 
+exports.validateNewPassword = [
+  check("password").isStrongPassword().withMessage("Password is not strong"),
+];
+
 exports.validate = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
